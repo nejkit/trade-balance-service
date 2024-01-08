@@ -1,0 +1,3 @@
+[submodule "dto/proto"]
+	path = dto/proto
+	url = https://github.com/nejkit/trade-protos
