@@ -56,21 +56,21 @@ func (b *BalancesProvider) EmmitBalanceByCurrency(ctx context.Context, assetId s
 	return nil
 }
 
-func (b BalancesProvider) EmmitBalanceById(ctx context.Context, id string, amount float64) error {
+func (b *BalancesProvider) EmmitBalanceById(ctx context.Context, id string, amount float64) error {
 	if err := b.commonProvider.ExecuteQuery(ctx, emmitBalanceByIdQuery, id, amount); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b BalancesProvider) LockBalanceById(ctx context.Context, id string, amount float64) error {
+func (b *BalancesProvider) LockBalanceById(ctx context.Context, id string, amount float64) error {
 	if err := b.commonProvider.ExecuteQuery(ctx, lockBalanceByIdQuery, id, amount); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b BalancesProvider) RefundBalanceById(ctx context.Context, id string, amount float64) error {
+func (b *BalancesProvider) RefundBalanceById(ctx context.Context, id string, amount float64) error {
 	if err := b.commonProvider.ExecuteQuery(ctx, refundBalanceByIdQuery, id, amount); err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (b BalancesProvider) RefundBalanceById(ctx context.Context, id string, amou
 	return nil
 }
 
-func (b BalancesProvider) ChargeBalanceById(ctx context.Context, id string, amount float64) error {
+func (b *BalancesProvider) ChargeBalanceById(ctx context.Context, id string, amount float64) error {
 	if err := b.commonProvider.ExecuteQuery(ctx, chargeBalanceByIdQuery, id, amount); err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (b BalancesProvider) ChargeBalanceById(ctx context.Context, id string, amou
 	return nil
 }
 
-func (b BalancesProvider) DeleteBalanceById(ctx context.Context, id string) error {
+func (b *BalancesProvider) DeleteBalanceById(ctx context.Context, id string) error {
 	if err := b.commonProvider.ExecuteQuery(ctx, deleteBalanceQuery, id); err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (b BalancesProvider) DeleteBalanceById(ctx context.Context, id string) erro
 	return nil
 }
 
-func (b BalancesProvider) GetBalancesInfoByAssetId(ctx context.Context, assetId string) ([]dto.BalanceModel, error) {
+func (b *BalancesProvider) GetBalancesInfoByAssetId(ctx context.Context, assetId string) ([]dto.BalanceModel, error) {
 	rows, err := b.commonProvider.ExecuteQueryRows(ctx, getBalancesByAssetIdQuery, assetId)
 
 	if err == pgx.ErrNoRows {

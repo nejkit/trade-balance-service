@@ -10,6 +10,7 @@ import (
 
 var (
 	getCurrencyInfoByShortName = "select id, currency_name, currency_code from currencies where currency_code = $1"
+	getCurrencyInfoById        = "select id, currency_name, currency_code from currencies where id = $1"
 	addNewCurrencyInfoQuery    = "insert into currencies ($1, $2, $3)"
 )
 
@@ -21,7 +22,7 @@ func NewCurrencyProvider(commonProvider *PgxProvider) CurrencyProvider {
 	return CurrencyProvider{commonProvider: commonProvider}
 }
 
-func (c CurrencyProvider) GetCurrencyInfoByCode(ctx context.Context, code string) (*dto.CurrencyModel, error) {
+func (c *CurrencyProvider) GetCurrencyInfoByCode(ctx context.Context, code string) (*dto.CurrencyModel, error) {
 	row, err := c.commonProvider.ExecuteQueryWithRow(ctx, getCurrencyInfoByShortName, code)
 
 	if err == pgx.ErrNoRows {
@@ -40,7 +41,26 @@ func (c CurrencyProvider) GetCurrencyInfoByCode(ctx context.Context, code string
 	return &data, nil
 }
 
-func (c CurrencyProvider) InsertCurrencyInfo(ctx context.Context, code string, fullName string) error {
+func (c *CurrencyProvider) GetCurrencyInfoById(ctx context.Context, id string) (*dto.CurrencyModel, error) {
+	row, err := c.commonProvider.ExecuteQueryWithRow(ctx, getCurrencyInfoById, id)
+
+	if err == pgx.ErrNoRows {
+		return nil, staticserr.ErrorNotExistsCurrency
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	data := dto.CurrencyModel{}
+
+	if err = row.Scan(&data.Id, &data.CurrencyName, &data.CurrencyCode); err != nil {
+		return nil, err
+	}
+
+	return &data, nil
+}
+
+func (c *CurrencyProvider) InsertCurrencyInfo(ctx context.Context, code string, fullName string) error {
 	id := uuid.NewString()
 	if err := c.commonProvider.ExecuteQuery(ctx, addNewCurrencyInfoQuery, id, fullName, code); err != nil {
 		return err

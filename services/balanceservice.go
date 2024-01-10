@@ -21,6 +21,7 @@ type IBalanceProvider interface {
 
 type ICurrencyProvider interface {
 	GetCurrencyInfoByCode(ctx context.Context, code string) (*dto.CurrencyModel, error)
+	GetCurrencyInfoById(ctx context.Context, id string) (*dto.CurrencyModel, error)
 	InsertCurrencyInfo(ctx context.Context, code string, fullName string) error
 }
 
@@ -33,7 +34,7 @@ func NewBalanceService(balanceProvider IBalanceProvider, currencyProvider ICurre
 	return BalanceService{balanceProvider: balanceProvider, currencyProvider: currencyProvider}
 }
 
-func (b BalanceService) EmmitBalance(ctx context.Context, assetId string, currencyCode string, amount float64) error {
+func (b *BalanceService) EmmitBalance(ctx context.Context, assetId string, currencyCode string, amount float64) error {
 	currencyModel, err := b.currencyProvider.GetCurrencyInfoByCode(ctx, currencyCode)
 
 	if err != nil {
@@ -60,7 +61,7 @@ func (b BalanceService) EmmitBalance(ctx context.Context, assetId string, curren
 	return nil
 }
 
-func (b BalanceService) AddCurrency(ctx context.Context, currencyName string, currencyCode string) error {
+func (b *BalanceService) AddCurrency(ctx context.Context, currencyName string, currencyCode string) error {
 	_, err := b.currencyProvider.GetCurrencyInfoByCode(ctx, currencyCode)
 
 	if err != nil && err != staticserr.ErrorNotExistsCurrency {
@@ -79,6 +80,24 @@ func (b BalanceService) AddCurrency(ctx context.Context, currencyName string, cu
 	return nil
 }
 
-func (b BalanceService) GetInfoAboutAssets(ctx context.Context, assetId string) ([]dto.BalanceModel, error) {
-	return b.balanceProvider.GetBalancesInfoByAssetId(ctx, assetId)
+func (b *BalanceService) GetInfoAboutAssets(ctx context.Context, assetId string) ([]dto.PublicBalanceModel, error) {
+	balancesDto, err := b.balanceProvider.GetBalancesInfoByAssetId(ctx, assetId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return b.mapToPublicInfo(ctx, balancesDto), nil
+}
+
+func (b *BalanceService) mapToPublicInfo(ctx context.Context, privateInfos []dto.BalanceModel) []dto.PublicBalanceModel {
+	var result []dto.PublicBalanceModel
+	for _, info := range privateInfos {
+		currencyInfo, _ := b.currencyProvider.GetCurrencyInfoById(ctx, info.CurrencyId)
+		result = append(result, dto.PublicBalanceModel{
+			CurrencyName: currencyInfo.CurrencyCode,
+			Amount:       info.Amount,
+			LockedAmount: info.LockedAmount})
+	}
+	return result
 }

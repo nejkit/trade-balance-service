@@ -13,3 +13,9 @@ type BalanceModel struct {
 	Amount       float64
 	LockedAmount float64
 }
+
+type PublicBalanceModel struct {
+	CurrencyName string
+	Amount       float64
+	LockedAmount float64
+}

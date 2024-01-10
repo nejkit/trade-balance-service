@@ -1,0 +1,16 @@
+package rabbit
+
+import (
+	"context"
+	"github.com/rabbitmq/amqp091-go"
+)
+
+type channelDto struct {
+	channel *amqp091.Channel
+	deliveryChannel <-chan amqp091.Delivery
+}
+
+type Listener[T any] struct {
+	channelDto
+
+}

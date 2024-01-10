@@ -20,11 +20,11 @@ func NewAssetService(provider IAssetProvider) AssetService {
 	return AssetService{provider: provider}
 }
 
-func (a AssetService) CreateNewAsset(ctx context.Context) (string, error) {
+func (a *AssetService) CreateNewAsset(ctx context.Context) (string, error) {
 	return a.provider.InsertNewAssetInfo(ctx)
 }
 
-func (a AssetService) GetAssetInfoById(ctx context.Context, id string) (*dto.TradeAsset, error) {
+func (a *AssetService) GetAssetInfoById(ctx context.Context, id string) (*dto.TradeAsset, error) {
 	info, err := a.provider.GetAssetInfoById(ctx, id)
 
 	if err != nil {
@@ -38,6 +38,6 @@ func (a AssetService) GetAssetInfoById(ctx context.Context, id string) (*dto.Tra
 	return nil, staticserr.ErrorNotFoundAsset
 }
 
-func (a AssetService) DeactivateAsset(ctx context.Context, id string) error {
+func (a *AssetService) DeactivateAsset(ctx context.Context, id string) error {
 	return a.provider.DeleteAssetById(ctx, id)
 }

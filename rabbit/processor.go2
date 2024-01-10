@@ -1,0 +1,30 @@
+package rabbit
+
+import (
+	"context"
+	"github.com/rabbitmq/amqp091-go"
+)
+
+type ParserFunc[ItemType any] func([]byte) (*ItemType, error)
+type HandlerFunc[temType any] func(context.Context, *itemType)
+
+type Processor[itemType any] struct {
+	parser ParserFunc[itemType]
+	handler HandlerFunc[itemType]
+}
+
+func NewProcessor[t any](parser ParserFunc[t], handler HandlerFunc[t]) Processor[t] {
+	return Processor[t]{parser: parser, handler: handler}
+}
+
+func (p *Processor[itemType]) ProcessMessage(ctx context.Context, msg amqp091.Delivery) {
+body, err := p.parser(msg.Body)
+
+if err != nil {
+_ = msg.Nack(false, false)
+return
+}
+
+_ = msg.Ack(false)
+p.handler(ctx, body)
+}
