@@ -10,7 +10,7 @@ import (
 
 type IFlow interface {
 	CreateAsset(ctx context.Context, request *balances.BpsCreateAssetRequest) *balances.BpsCreateAssetResponse
-	EmmitAsset(ctx context.Context, request *balances.EmmitBalanceRequest) *balances.EmmitBalanceResponse
+	EmmitAsset(ctx context.Context, request *balances.BpsEmmitAssetRequest)
 	GetAssetsById(ctx context.Context, request *balances.BbsGetAssetInfoRequest) *balances.BpsGetAssetInfoResponse
 }
 
@@ -32,9 +32,8 @@ func (h *HandlerCollection) HandleCreateAsset(ctx context.Context, request *bala
 	h.sender.SendMessage(ctx, resp, constants.BpsExchange, constants.RkCreateAssetResponse)
 }
 
-func (h *HandlerCollection) HandleEmmitAsset(ctx context.Context, request *balances.EmmitBalanceRequest) {
-	resp := h.flow.EmmitAsset(ctx, request)
-	h.sender.SendMessage(ctx, resp, constants.BpsExchange, constants.RkEmmitAssetResponse)
+func (h *HandlerCollection) HandleEmmitAsset(ctx context.Context, request *balances.BpsEmmitAssetRequest) {
+	h.flow.EmmitAsset(ctx, request)
 }
 
 func (h *HandlerCollection) HandleGetAssetsById(ctx context.Context, request *balances.BbsGetAssetInfoRequest) {

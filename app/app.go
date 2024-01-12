@@ -20,13 +20,11 @@ import (
 
 func StartProgram(ctx context.Context, postgreeUrl, rabbitUrl string) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
-	flow, _ := getFlow(ctxWithCancel, postgreeUrl)
-
-	initRabbit(ctxWithCancel, rabbitUrl, *flow)
+	initHandler(ctxWithCancel, rabbitUrl, postgreeUrl)
 	handleGracefulShutdown(cancel)
 }
 
-func getFlow(ctx context.Context, postgreeUrl string) (*flow.Flow, error) {
+func getFlow(ctx context.Context, postgreeUrl string, sender *rabbit.Sender) (*flow.Flow, error) {
 
 	pgxPool, err := pgxpool.Connect(ctx, postgreeUrl)
 
@@ -43,12 +41,12 @@ func getFlow(ctx context.Context, postgreeUrl string) (*flow.Flow, error) {
 	assetService := services.NewAssetService(&assetsProvider)
 	balancesService := services.NewBalanceService(&balancesProvider, &currenciesProvider)
 
-	flow := flow.NewFlow(&assetService, &balancesService)
+	flow := flow.NewFlow(&assetService, &balancesService, sender)
 
 	return flow, nil
 }
 
-func initRabbit(ctx context.Context, rabbitUrl string, flow flow.Flow) error {
+func initHandler(ctx context.Context, rabbitUrl string, postgreeUrl string) error {
 	rabbitConnection, err := rabbit.GetRabbitConnection(rabbitUrl)
 
 	if err != nil {
@@ -89,14 +87,16 @@ func initRabbit(ctx context.Context, rabbitUrl string, flow flow.Flow) error {
 
 	sender := rabbit.NewSender(ctx, senderChannel)
 
-	handlerCollection := handler.NewHandlerCollection(&flow, &sender)
+	flow, err := getFlow(ctx, postgreeUrl, &sender)
+
+	handlerCollection := handler.NewHandlerCollection(flow, &sender)
 
 	creationAssetProcessor := rabbit.NewProcessor[balances.BpsCreateAssetRequest](rabbit.GetParserForCreationAssetRequest(), handlerCollection.HandleCreateAsset)
-	emmitAssetProcessor := rabbit.NewProcessor[balances.EmmitBalanceRequest](rabbit.GetParserForEmmitAssetRequest(), handlerCollection.HandleEmmitAsset)
+	emmitAssetProcessor := rabbit.NewProcessor[balances.BpsEmmitAssetRequest](rabbit.GetParserForEmmitAssetRequest(), handlerCollection.HandleEmmitAsset)
 	getAssetsProcessor := rabbit.NewProcessor[balances.BbsGetAssetInfoRequest](rabbit.GetParserForGetAssetsById(), handlerCollection.HandleGetAssetsById)
 
 	creationAssetListener, err := rabbit.NewListener[balances.BpsCreateAssetRequest](ctx, creationLisChannel, constants.CreateAssetQueueName, creationAssetProcessor)
-	emmitAssetListener, err := rabbit.NewListener[balances.EmmitBalanceRequest](ctx, emmitLisChannel, constants.EmmitAssetQueueName, emmitAssetProcessor)
+	emmitAssetListener, err := rabbit.NewListener[balances.BpsEmmitAssetRequest](ctx, emmitLisChannel, constants.EmmitAssetQueueName, emmitAssetProcessor)
 	getAssetsListener, err := rabbit.NewListener[balances.BbsGetAssetInfoRequest](ctx, getAssetsLisChannel, constants.GetAssetsByIdQueueName, getAssetsProcessor)
 
 	go creationAssetListener.Run(ctx)

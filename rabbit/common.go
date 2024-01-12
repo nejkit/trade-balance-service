@@ -41,9 +41,9 @@ func GetParserForCreationAssetRequest() ParserFunc[balances.BpsCreateAssetReques
 	}
 }
 
-func GetParserForEmmitAssetRequest() ParserFunc[balances.EmmitBalanceRequest] {
-	return func(b []byte) (*balances.EmmitBalanceRequest, error) {
-		var request balances.EmmitBalanceRequest
+func GetParserForEmmitAssetRequest() ParserFunc[balances.BpsEmmitAssetRequest] {
+	return func(b []byte) (*balances.BpsEmmitAssetRequest, error) {
+		var request balances.BpsEmmitAssetRequest
 		err := proto.Unmarshal(b, &request)
 
 		if err != nil {

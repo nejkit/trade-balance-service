@@ -2,11 +2,14 @@ package flow
 
 import (
 	"context"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
+	"trade-balance-service/constants"
 	"trade-balance-service/dto"
 	"trade-balance-service/external/balances"
 	"trade-balance-service/utils"
+
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type IAssetService interface {
@@ -21,62 +24,73 @@ type IBalanceService interface {
 	GetInfoAboutAssets(ctx context.Context, assetId string) ([]dto.PublicBalanceModel, error)
 }
 
+type ISender interface {
+	SendMessage(ctx context.Context, message protoreflect.ProtoMessage, exchange, rk string) error
+}
+
 type Flow struct {
 	assetService   IAssetService
 	balanceService IBalanceService
+	sender         ISender
 }
 
-func NewFlow(assetService IAssetService, balanceService IBalanceService) *Flow {
-	return &Flow{assetService: assetService, balanceService: balanceService}
+func NewFlow(assetService IAssetService, balanceService IBalanceService, sender ISender) *Flow {
+	return &Flow{assetService: assetService, balanceService: balanceService, sender: sender}
 }
 
 func (f *Flow) CreateAsset(ctx context.Context, request *balances.BpsCreateAssetRequest) *balances.BpsCreateAssetResponse {
 	assetId, err := f.assetService.CreateNewAsset(ctx)
 
 	if err != nil {
-		return &balances.BpsCreateAssetResponse{Id: request.Id, Errors: map[string]*balances.BpsError{
-			"asset": {Message: err.Error(), ErrorCode: utils.MapError(err)},
-		}}
+		return &balances.BpsCreateAssetResponse{Id: request.Id, Error: &balances.BpsError{Message: err.Error(), ErrorCode: utils.MapError(err)}}
 	}
 
 	response := balances.BpsCreateAssetResponse{Id: request.Id, AssetId: assetId}
 
-	for _, emmitInfo := range request.EmmitInfo {
-		err := f.balanceService.EmmitBalance(ctx, assetId, emmitInfo.CurrencyName, emmitInfo.Amount)
-		if err != nil {
-			if response.Errors == nil {
-				response.Errors = make(map[string]*balances.BpsError)
+	go func() {
+		for _, emmitInfo := range request.EmmitInfo {
+			resp := balances.BpsEmmitAssetResponse{
+				Id:           request.Id,
+				AssetId:      assetId,
+				CurrencyCode: emmitInfo.CurrencyName,
+				Amount:       emmitInfo.Amount,
 			}
-			response.Errors[emmitInfo.CurrencyName] = &balances.BpsError{Message: err.Error(), ErrorCode: utils.MapError(err)}
+			err := f.balanceService.EmmitBalance(ctx, assetId, emmitInfo.CurrencyName, emmitInfo.Amount)
+			if err != nil {
+				resp.Error = &balances.BpsError{Message: err.Error(), ErrorCode: utils.MapError(err)}
+			}
+			f.sender.SendMessage(ctx, &resp, constants.BpsExchange, constants.RkEmmitAssetResponse)
 		}
-	}
+	}()
 
 	return &response
 
 }
 
-func (f *Flow) EmmitAsset(ctx context.Context, request *balances.EmmitBalanceRequest) *balances.EmmitBalanceResponse {
+func (f *Flow) EmmitAsset(ctx context.Context, request *balances.BpsEmmitAssetRequest) {
 	_, err := f.assetService.GetAssetInfoById(ctx, request.GetAssetId())
 
-	response := balances.EmmitBalanceResponse{Id: request.Id, AssetId: request.AssetId}
+	response := balances.BpsEmmitAssetResponse{Id: request.Id, AssetId: request.AssetId}
 
 	if err != nil {
-		return &balances.EmmitBalanceResponse{Id: request.Id, AssetId: request.AssetId, Errors: map[string]*balances.BpsError{
-			"asset": {Message: err.Error(), ErrorCode: utils.MapError(err)},
-		}}
+		response.Error = &balances.BpsError{ErrorCode: utils.MapError(err), Message: err.Error()}
+		f.sender.SendMessage(ctx, &response, constants.BpsExchange, constants.RkEmmitAssetResponse)
+		return
 	}
 
 	for _, emmitData := range request.EmitBalancesInfo {
+		resp := balances.BpsEmmitAssetResponse{
+			Id:           request.Id,
+			AssetId:      request.AssetId,
+			CurrencyCode: emmitData.CurrencyName,
+			Amount:       emmitData.Amount,
+		}
 		err := f.balanceService.EmmitBalance(ctx, request.AssetId, emmitData.CurrencyName, emmitData.Amount)
 		if err != nil {
-			if response.Errors == nil {
-				response.Errors = make(map[string]*balances.BpsError)
-			}
-			response.Errors[emmitData.CurrencyName] = &balances.BpsError{Message: err.Error(), ErrorCode: utils.MapError(err)}
+			resp.Error = &balances.BpsError{Message: err.Error(), ErrorCode: utils.MapError(err)}
 		}
+		f.sender.SendMessage(ctx, &resp, constants.BpsExchange, constants.RkEmmitAssetResponse)
 	}
-
-	return &response
 }
 
 func (f *Flow) GetAssetsById(ctx context.Context, request *balances.BbsGetAssetInfoRequest) *balances.BpsGetAssetInfoResponse {
