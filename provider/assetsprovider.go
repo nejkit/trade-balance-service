@@ -2,11 +2,12 @@ package provider
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4"
 	"time"
 	"trade-balance-service/dto"
 	"trade-balance-service/staticserr"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v4"
 )
 
 var (

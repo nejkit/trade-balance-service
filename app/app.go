@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"trade-balance-service/constants"
 	"trade-balance-service/external/balances"
 	"trade-balance-service/flow"
 	"trade-balance-service/handler"
@@ -14,17 +15,18 @@ import (
 	"trade-balance-service/services"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 func StartProgram(ctx context.Context, postgreeUrl, rabbitUrl string) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
-	handlerCollection, _ := getHandler(ctxWithCancel, postgreeUrl)
+	flow, _ := getFlow(ctxWithCancel, postgreeUrl)
 
-	initRabbit(ctxWithCancel, rabbitUrl, *handlerCollection)
-	go handleGracefulShutdown(cancel)
+	initRabbit(ctxWithCancel, rabbitUrl, *flow)
+	handleGracefulShutdown(cancel)
 }
 
-func getHandler(ctx context.Context, postgreeUrl string) (*handler.HandlerCollection, error) {
+func getFlow(ctx context.Context, postgreeUrl string) (*flow.Flow, error) {
 
 	pgxPool, err := pgxpool.Connect(ctx, postgreeUrl)
 
@@ -43,17 +45,23 @@ func getHandler(ctx context.Context, postgreeUrl string) (*handler.HandlerCollec
 
 	flow := flow.NewFlow(&assetService, &balancesService)
 
-	handlerCollection := handler.NewHandlerCollection(flow)
-
-	return &handlerCollection, nil
+	return flow, nil
 }
 
-func initRabbit(ctx context.Context, rabbitUrl string, handlerCollection handler.HandlerCollection) error {
+func initRabbit(ctx context.Context, rabbitUrl string, flow flow.Flow) error {
 	rabbitConnection, err := rabbit.GetRabbitConnection(rabbitUrl)
 
 	if err != nil {
 		return err
 	}
+
+	commonChannel, err := rabbitConnection.Channel()
+
+	if err != nil {
+		return err
+	}
+
+	initRabbitInfrastructure(commonChannel)
 
 	creationLisChannel, err := rabbitConnection.Channel()
 
@@ -73,13 +81,23 @@ func initRabbit(ctx context.Context, rabbitUrl string, handlerCollection handler
 		return err
 	}
 
+	senderChannel, err := rabbitConnection.Channel()
+
+	if err != nil {
+		return err
+	}
+
+	sender := rabbit.NewSender(ctx, senderChannel)
+
+	handlerCollection := handler.NewHandlerCollection(&flow, &sender)
+
 	creationAssetProcessor := rabbit.NewProcessor[balances.BpsCreateAssetRequest](rabbit.GetParserForCreationAssetRequest(), handlerCollection.HandleCreateAsset)
 	emmitAssetProcessor := rabbit.NewProcessor[balances.EmmitBalanceRequest](rabbit.GetParserForEmmitAssetRequest(), handlerCollection.HandleEmmitAsset)
 	getAssetsProcessor := rabbit.NewProcessor[balances.BbsGetAssetInfoRequest](rabbit.GetParserForGetAssetsById(), handlerCollection.HandleGetAssetsById)
 
-	creationAssetListener, err := rabbit.NewListener[balances.BpsCreateAssetRequest](ctx, creationLisChannel, "", creationAssetProcessor)
-	emmitAssetListener, err := rabbit.NewListener[balances.EmmitBalanceRequest](ctx, emmitLisChannel, "", emmitAssetProcessor)
-	getAssetsListener, err := rabbit.NewListener[balances.BbsGetAssetInfoRequest](ctx, getAssetsLisChannel, "", getAssetsProcessor)
+	creationAssetListener, err := rabbit.NewListener[balances.BpsCreateAssetRequest](ctx, creationLisChannel, constants.CreateAssetQueueName, creationAssetProcessor)
+	emmitAssetListener, err := rabbit.NewListener[balances.EmmitBalanceRequest](ctx, emmitLisChannel, constants.EmmitAssetQueueName, emmitAssetProcessor)
+	getAssetsListener, err := rabbit.NewListener[balances.BbsGetAssetInfoRequest](ctx, getAssetsLisChannel, constants.GetAssetsByIdQueueName, getAssetsProcessor)
 
 	go creationAssetListener.Run(ctx)
 	go emmitAssetListener.Run(ctx)
@@ -95,11 +113,38 @@ func handleGracefulShutdown(cancelFunc context.CancelFunc) {
 		case <-exit:
 			{
 				cancelFunc()
-				break
+				return
 			}
 		default:
 			time.Sleep(2 * time.Second)
 		}
 
 	}
+}
+
+func initRabbitInfrastructure(channel *amqp091.Channel) error {
+	defer channel.Close()
+
+	if err := channel.ExchangeDeclare(constants.BpsExchange, "topic", true, false, false, false, nil); err != nil {
+		return err
+	}
+	if _, err := channel.QueueDeclare(constants.CreateAssetQueueName, true, false, false, false, nil); err != nil {
+		return err
+	}
+	if _, err := channel.QueueDeclare(constants.EmmitAssetQueueName, true, false, false, false, nil); err != nil {
+		return err
+	}
+	if _, err := channel.QueueDeclare(constants.GetAssetsByIdQueueName, true, false, false, false, nil); err != nil {
+		return err
+	}
+	if err := channel.QueueBind(constants.CreateAssetQueueName, constants.RkCreateAssetRequest, constants.BpsExchange, false, nil); err != nil {
+		return nil
+	}
+	if err := channel.QueueBind(constants.EmmitAssetQueueName, constants.RkEmmitAssetRequest, constants.BpsExchange, false, nil); err != nil {
+		return nil
+	}
+	if err := channel.QueueBind(constants.GetAssetsByIdQueueName, constants.RkGetAssetsRequest, constants.BpsExchange, false, nil); err != nil {
+		return nil
+	}
+	return nil
 }

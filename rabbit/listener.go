@@ -40,6 +40,9 @@ func (l *Listener[T]) Run(ctx context.Context) {
 				continue
 			}
 			go l.processor.processMessage(ctx, msg)
+		case <-ctx.Done():
+			l.config.channel.Close()
+			return
 		}
 	}
 }

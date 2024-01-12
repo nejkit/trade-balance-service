@@ -8,8 +8,7 @@ const (
 )
 
 type TradeAsset struct {
-	Id           string
-	CreatedDate  int64
-	State        AssetState
-	SecurityCode string
+	Id          string
+	CreatedDate int64
+	State       AssetState
 }

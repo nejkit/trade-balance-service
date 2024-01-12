@@ -2,6 +2,7 @@ package rabbit
 
 import (
 	"context"
+	"time"
 
 	"github.com/rabbitmq/amqp091-go"
 	"google.golang.org/protobuf/proto"
@@ -12,8 +13,10 @@ type Sender struct {
 	channel *amqp091.Channel
 }
 
-func NewSender(channel *amqp091.Channel) Sender {
-	return Sender{channel: channel}
+func NewSender(ctx context.Context, channel *amqp091.Channel) Sender {
+	s := Sender{channel: channel}
+	go s.handleGraceful(ctx)
+	return s
 }
 
 func (s *Sender) SendMessage(ctx context.Context, message protoreflect.ProtoMessage, exchange, rk string) error {
@@ -32,4 +35,17 @@ func (s *Sender) SendMessage(ctx context.Context, message protoreflect.ProtoMess
 		return err
 	}
 	return nil
+}
+
+func (s *Sender) handleGraceful(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			s.channel.Close()
+			return
+		default:
+			time.Sleep(time.Millisecond * 100)
+		}
+
+	}
 }

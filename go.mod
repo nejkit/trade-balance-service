@@ -8,6 +8,8 @@ require (
 	google.golang.org/protobuf v1.32.0
 )
 
+require github.com/caarlos0/env v3.5.0+incompatible // indirect
+
 require (
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
