@@ -2,10 +2,11 @@ package provider
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4"
 	"trade-balance-service/dto"
 	"trade-balance-service/staticserr"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v4"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 	chargeBalanceByIdQuery      = "update balances set locked_amount = locked_amount - $2 where id = $1"
 	refundBalanceByIdQuery      = "update balances set amount = amount + $2, locked_amount = locked_amount - $2 where id = $1"
 	lockBalanceByIdQuery        = "update balances set amount = amount - $2, locked_amount = locked_amount + $2 where id = $1"
-	insertBalanceQuery          = "insert into balances ($1, $2, $3, $4, $5)"
+	insertBalanceQuery          = "insert into balances values ($1, $2, $3, $4, $5)"
 	deleteBalanceQuery          = "delete balances where id = $1"
 )
 
@@ -116,9 +117,6 @@ func (b *BalancesProvider) GetBalancesInfoByAssetId(ctx context.Context, assetId
 }
 
 func parseResponse(row pgx.Row, err error) (*dto.BalanceModel, error) {
-	if err == pgx.ErrNoRows {
-		return nil, staticserr.ErrorNotEnoughBalance
-	}
 
 	if err != nil {
 		return nil, err
@@ -127,6 +125,10 @@ func parseResponse(row pgx.Row, err error) (*dto.BalanceModel, error) {
 	result := dto.BalanceModel{}
 
 	err = row.Scan(&result.Id, &result.AssetId, &result.CurrencyId, &result.Amount, &result.LockedAmount)
+
+	if err == pgx.ErrNoRows {
+		return nil, staticserr.ErrorNotEnoughBalance
+	}
 
 	if err != nil {
 		return nil, err

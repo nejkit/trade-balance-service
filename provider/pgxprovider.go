@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -22,7 +23,7 @@ func (p *PgxProvider) ExecuteQuery(ctx context.Context, query string, params ...
 
 	defer con.Release()
 
-	_, err = con.Exec(ctx, query, params)
+	_, err = con.Exec(ctx, query, params...)
 	if err != nil {
 		return err
 	}
@@ -39,7 +40,7 @@ func (p *PgxProvider) ExecuteQueryWithRow(ctx context.Context, query string, par
 
 	defer con.Release()
 
-	return con.QueryRow(ctx, query, params), nil
+	return con.QueryRow(ctx, query, params...), nil
 }
 
 func (p *PgxProvider) ExecuteQueryRows(ctx context.Context, query string, params ...interface{}) (pgx.Rows, error) {
@@ -50,5 +51,5 @@ func (p *PgxProvider) ExecuteQueryRows(ctx context.Context, query string, params
 	}
 	defer con.Release()
 
-	return con.Query(ctx, query, params)
+	return con.Query(ctx, query, params...)
 }

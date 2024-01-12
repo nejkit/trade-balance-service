@@ -5,6 +5,7 @@ import (
 	"trade-balance-service/constants"
 	"trade-balance-service/external/balances"
 
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -38,5 +39,6 @@ func (h *HandlerCollection) HandleEmmitAsset(ctx context.Context, request *balan
 
 func (h *HandlerCollection) HandleGetAssetsById(ctx context.Context, request *balances.BbsGetAssetInfoRequest) {
 	resp := h.flow.GetAssetsById(ctx, request)
+	logrus.Infoln("Asset Info for http: ", resp.String())
 	h.sender.SendMessage(ctx, resp, constants.BpsExchange, constants.RkGetAssetsResponse)
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"trade-balance-service/dto"
 	"trade-balance-service/staticserr"
+
+	logger "github.com/sirupsen/logrus"
 )
 
 type IBalanceProvider interface {
@@ -44,11 +46,14 @@ func (b *BalanceService) EmmitBalance(ctx context.Context, assetId string, curre
 	balanceModel, err := b.balanceProvider.GetInfoAboutBalanceByCurrency(ctx, assetId, currencyModel.Id)
 
 	if err == staticserr.ErrorNotEnoughBalance {
+		logger.Infoln("Balance on asset ", assetId, " with currency ", currencyCode, " not exists, try insert info in db...")
 		if err = b.balanceProvider.InsertBalanceInfo(ctx, assetId, currencyModel.Id, amount); err != nil {
+			logger.Errorln("Balance error: ", err.Error())
 			return err
 		}
 		return nil
 	}
+
 	if err != nil {
 		return err
 	}

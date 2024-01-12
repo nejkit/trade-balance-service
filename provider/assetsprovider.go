@@ -12,7 +12,7 @@ import (
 
 var (
 	getAssetQuery    = "select id, creation_date, state from assets where id = $1"
-	insertAssetQuery = "insert into assets ($1, $2, $3)"
+	insertAssetQuery = "insert into assets values ($1, $2, $3)"
 	deleteAssetQuery = "update assets set state = $2 where id = $1"
 )
 
