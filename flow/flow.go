@@ -8,6 +8,7 @@ import (
 	"trade-balance-service/external/balances"
 	"trade-balance-service/utils"
 
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -68,6 +69,7 @@ func (f *Flow) CreateAsset(ctx context.Context, request *balances.BpsCreateAsset
 }
 
 func (f *Flow) EmmitAsset(ctx context.Context, request *balances.BpsEmmitAssetRequest) {
+	logrus.Infoln("Received request for emmit: ", request.String())
 	_, err := f.assetService.GetAssetInfoById(ctx, request.GetAssetId())
 
 	response := balances.BpsEmmitAssetResponse{Id: request.Id, AssetId: request.AssetId}

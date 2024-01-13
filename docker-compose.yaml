@@ -9,6 +9,14 @@ volumes:
     driver: local
 
 services:
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - trade-network
   rabbitmq:
     image: rabbitmq:3.10.7-management
     hostname: rabbitmq
