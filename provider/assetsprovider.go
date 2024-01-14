@@ -37,7 +37,7 @@ func (a *AssetsProvider) GetAssetInfoById(ctx context.Context, id string) (*dto.
 
 	result := dto.TradeAsset{}
 
-	err = row.Scan(&result.Id, &result.CreatedDate, &result.State)
+	err = row.Scan(&result.Id, &result.AccountId, &result.CreatedDate, &result.State)
 
 	if err != nil {
 		return nil, err
