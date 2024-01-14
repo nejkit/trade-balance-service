@@ -9,6 +9,7 @@ const (
 
 type TradeAsset struct {
 	Id          string
+	AccountId   string
 	CreatedDate int64
 	State       AssetState
 }

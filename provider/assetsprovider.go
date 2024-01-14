@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	getAssetQuery    = "select id, creation_date, state from assets where id = $1"
-	insertAssetQuery = "insert into assets values ($1, $2, $3)"
+	getAssetQuery    = "select id, account_id, creation_date, state from assets where id = $1"
+	insertAssetQuery = "insert into assets values ($1, $2, $3, $4)"
 	deleteAssetQuery = "update assets set state = $2 where id = $1"
 )
 
@@ -46,11 +46,11 @@ func (a *AssetsProvider) GetAssetInfoById(ctx context.Context, id string) (*dto.
 	return &result, nil
 }
 
-func (a *AssetsProvider) InsertNewAssetInfo(ctx context.Context) (string, error) {
+func (a *AssetsProvider) InsertNewAssetInfo(ctx context.Context, accountId string) (string, error) {
 	id := uuid.NewString()
 	createdDate := time.Now().UTC().UnixMilli()
 
-	err := a.commonProvider.ExecuteQuery(ctx, insertAssetQuery, id, createdDate, dto.ACTIVE)
+	err := a.commonProvider.ExecuteQuery(ctx, insertAssetQuery, id, createdDate, dto.ACTIVE, accountId)
 
 	if err != nil {
 		return "", err

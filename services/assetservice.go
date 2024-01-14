@@ -8,7 +8,7 @@ import (
 
 type IAssetProvider interface {
 	GetAssetInfoById(ctx context.Context, id string) (*dto.TradeAsset, error)
-	InsertNewAssetInfo(ctx context.Context) (string, error)
+	InsertNewAssetInfo(ctx context.Context, accountId string) (string, error)
 	DeleteAssetById(ctx context.Context, id string) error
 }
 
@@ -20,8 +20,8 @@ func NewAssetService(provider IAssetProvider) AssetService {
 	return AssetService{provider: provider}
 }
 
-func (a *AssetService) CreateNewAsset(ctx context.Context) (string, error) {
-	return a.provider.InsertNewAssetInfo(ctx)
+func (a *AssetService) CreateNewAsset(ctx context.Context, accountId string) (string, error) {
+	return a.provider.InsertNewAssetInfo(ctx, accountId)
 }
 
 func (a *AssetService) GetAssetInfoById(ctx context.Context, id string) (*dto.TradeAsset, error) {

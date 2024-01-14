@@ -6,6 +6,7 @@ import (
 	"trade-balance-service/constants"
 	"trade-balance-service/dto"
 	"trade-balance-service/external/balances"
+	"trade-balance-service/staticserr"
 	"trade-balance-service/utils"
 
 	"github.com/sirupsen/logrus"
@@ -14,7 +15,7 @@ import (
 )
 
 type IAssetService interface {
-	CreateNewAsset(ctx context.Context) (string, error)
+	CreateNewAsset(ctx context.Context, accountId string) (string, error)
 	GetAssetInfoById(ctx context.Context, id string) (*dto.TradeAsset, error)
 	DeactivateAsset(ctx context.Context, id string) error
 }
@@ -40,7 +41,11 @@ func NewFlow(assetService IAssetService, balanceService IBalanceService, sender 
 }
 
 func (f *Flow) CreateAsset(ctx context.Context, request *balances.BpsCreateAssetRequest) *balances.BpsCreateAssetResponse {
-	assetId, err := f.assetService.CreateNewAsset(ctx)
+	if request.AccountId == "" {
+		return &balances.BpsCreateAssetResponse{Id: request.Id, Error: &balances.BpsError{Message: staticserr.ErrorNotRelatedAccount.Error(), ErrorCode: utils.MapError(staticserr.ErrorNotRelatedAccount)}}
+	}
+
+	assetId, err := f.assetService.CreateNewAsset(ctx, request.AccountId)
 
 	if err != nil {
 		return &balances.BpsCreateAssetResponse{Id: request.Id, Error: &balances.BpsError{Message: err.Error(), ErrorCode: utils.MapError(err)}}
@@ -70,7 +75,7 @@ func (f *Flow) CreateAsset(ctx context.Context, request *balances.BpsCreateAsset
 
 func (f *Flow) EmmitAsset(ctx context.Context, request *balances.BpsEmmitAssetRequest) {
 	logrus.Infoln("Received request for emmit: ", request.String())
-	_, err := f.assetService.GetAssetInfoById(ctx, request.GetAssetId())
+	assetInfo, err := f.assetService.GetAssetInfoById(ctx, request.GetAssetId())
 
 	response := balances.BpsEmmitAssetResponse{Id: request.Id, AssetId: request.AssetId}
 
@@ -83,6 +88,7 @@ func (f *Flow) EmmitAsset(ctx context.Context, request *balances.BpsEmmitAssetRe
 	for _, emmitData := range request.EmitBalancesInfo {
 		resp := balances.BpsEmmitAssetResponse{
 			Id:           request.Id,
+			AccountId:    assetInfo.AccountId,
 			AssetId:      request.AssetId,
 			CurrencyCode: emmitData.CurrencyName,
 			Amount:       emmitData.Amount,
@@ -102,6 +108,13 @@ func (f *Flow) GetAssetsById(ctx context.Context, request *balances.BbsGetAssetI
 		return &balances.BpsGetAssetInfoResponse{
 			Id:    request.GetId(),
 			Error: &balances.BpsError{Message: err.Error(), ErrorCode: utils.MapError(err)}}
+	}
+
+	if assetInfo.AccountId != request.AccountId {
+		return &balances.BpsGetAssetInfoResponse{
+			Id:    request.Id,
+			Error: &balances.BpsError{Message: staticserr.ErrorNotRelatedAccount.Error(), ErrorCode: utils.MapError(staticserr.ErrorNotRelatedAccount)},
+		}
 	}
 
 	assetBalancesInfo, err := f.balanceService.GetInfoAboutAssets(ctx, assetInfo.Id)

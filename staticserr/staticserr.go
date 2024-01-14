@@ -8,4 +8,5 @@ var (
 	ErrorNotExistsCurrency     = errors.New("CurrencyNotExists")
 	ErrorCurrencyAlreadyExists = errors.New("CurrencyAlreadyExists")
 	ErrorRabbitConnectionFail  = errors.New("ErrorRabbitConnectionFail")
+	ErrorNotRelatedAccount     = errors.New("NotRelatedAccount")
 )
