@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 	"trade-balance-service/constants"
-	"trade-balance-service/external/balances"
+	"trade-balance-service/external/bps"
 	"trade-balance-service/flow"
 	"trade-balance-service/handler"
 	"trade-balance-service/provider"
@@ -79,6 +79,36 @@ func initHandler(ctx context.Context, rabbitUrl string, postgreeUrl string) erro
 		return err
 	}
 
+	addCurrencyLisChannel, err := rabbitConnection.Channel()
+
+	if err != nil {
+		return err
+	}
+
+	deactivateAssetLisChannel, err := rabbitConnection.Channel()
+
+	if err != nil {
+		return err
+	}
+
+	lockBalanceAssetLisChannel, err := rabbitConnection.Channel()
+
+	if err != nil {
+		return err
+	}
+
+	refundBalanceAssetLisChannel, err := rabbitConnection.Channel()
+
+	if err != nil {
+		return err
+	}
+
+	transferLisChannel, err := rabbitConnection.Channel()
+
+	if err != nil {
+		return err
+	}
+
 	senderChannel, err := rabbitConnection.Channel()
 
 	if err != nil {
@@ -91,17 +121,37 @@ func initHandler(ctx context.Context, rabbitUrl string, postgreeUrl string) erro
 
 	handlerCollection := handler.NewHandlerCollection(flow, &sender)
 
-	creationAssetProcessor := rabbit.NewProcessor[balances.BpsCreateAssetRequest](rabbit.GetParserForCreationAssetRequest(), handlerCollection.HandleCreateAsset)
-	emmitAssetProcessor := rabbit.NewProcessor[balances.BpsEmmitAssetRequest](rabbit.GetParserForEmmitAssetRequest(), handlerCollection.HandleEmmitAsset)
-	getAssetsProcessor := rabbit.NewProcessor[balances.BbsGetAssetInfoRequest](rabbit.GetParserForGetAssetsById(), handlerCollection.HandleGetAssetsById)
+	creationAssetProcessor := rabbit.NewProcessor[bps.BpsCreateAssetRequest](rabbit.GetParserForCreationAssetRequest(), handlerCollection.HandleCreateAsset)
+	emmitAssetProcessor := rabbit.NewProcessor[bps.BpsEmmitAssetRequest](rabbit.GetParserForEmmitAssetRequest(), handlerCollection.HandleEmmitAsset)
+	getAssetsProcessor := rabbit.NewProcessor[bps.BbsGetAssetInfoRequest](rabbit.GetParserForGetAssetsById(), handlerCollection.HandleGetAssetsById)
+	deactivateAssetProcessor := rabbit.NewProcessor[bps.BpsDeactivateAssetRequest](rabbit.GetParserForDeactivateAsset(), handlerCollection.HandleDeactivateAsset)
+	addCurrencyProcessor := rabbit.NewProcessor[bps.BpsAddCurrencyRequest](rabbit.GetParserForAddCurrency(), handlerCollection.HandleAddCurrency)
+	lockBalanceProcessor := rabbit.NewProcessor[bps.BpsLockBalanceRequest](rabbit.GetParserForLockBalanceAsset(), handlerCollection.HandleLockBalanceAsset)
+	refundBalanceProcessor := rabbit.NewProcessor[bps.BpsRefundBalanceRequest](rabbit.GetParserForRefundBalanceAsset(), handlerCollection.HandleRefundBalanceAsset)
+	transferProcessor := rabbit.NewProcessor[bps.BpsCreateTransferRequest](rabbit.GetParserForCreateTransfer(), handlerCollection.HandleCreateTransfer)
 
-	creationAssetListener, err := rabbit.NewListener[balances.BpsCreateAssetRequest](ctx, creationLisChannel, constants.CreateAssetQueueName, creationAssetProcessor)
-	emmitAssetListener, err := rabbit.NewListener[balances.BpsEmmitAssetRequest](ctx, emmitLisChannel, constants.EmmitAssetQueueName, emmitAssetProcessor)
-	getAssetsListener, err := rabbit.NewListener[balances.BbsGetAssetInfoRequest](ctx, getAssetsLisChannel, constants.GetAssetsByIdQueueName, getAssetsProcessor)
+	creationAssetListener, err := rabbit.NewListener[bps.BpsCreateAssetRequest](ctx, creationLisChannel, constants.CreateAssetQueueName, creationAssetProcessor)
+	emmitAssetListener, err := rabbit.NewListener[bps.BpsEmmitAssetRequest](ctx, emmitLisChannel, constants.EmmitAssetQueueName, emmitAssetProcessor)
+	getAssetsListener, err := rabbit.NewListener[bps.BbsGetAssetInfoRequest](ctx, getAssetsLisChannel, constants.GetAssetsByIdQueueName, getAssetsProcessor)
+	deactivateAssetListener, err := rabbit.NewListener[bps.BpsDeactivateAssetRequest](ctx, deactivateAssetLisChannel, constants.DeactivateAssetQueueName, deactivateAssetProcessor)
+	addCurrencyListener, err := rabbit.NewListener[bps.BpsAddCurrencyRequest](ctx, addCurrencyLisChannel, constants.AddNewCurrencyQueueName, addCurrencyProcessor)
+	lockBalanceListener, err := rabbit.NewListener[bps.BpsLockBalanceRequest](ctx, lockBalanceAssetLisChannel, constants.LockBalanceAssetQueueName, lockBalanceProcessor)
+	refundBalanceListener, err := rabbit.NewListener[bps.BpsRefundBalanceRequest](ctx, refundBalanceAssetLisChannel, constants.UnlockBalanceAssetQueueName, refundBalanceProcessor)
+	transferListener, err := rabbit.NewListener[bps.BpsCreateTransferRequest](ctx, transferLisChannel, constants.CreateTransferQueueName, transferProcessor)
+
+	if err != nil {
+		return err
+	}
 
 	go creationAssetListener.Run(ctx)
 	go emmitAssetListener.Run(ctx)
 	go getAssetsListener.Run(ctx)
+	go deactivateAssetListener.Run(ctx)
+	go addCurrencyListener.Run(ctx)
+	go lockBalanceListener.Run(ctx)
+	go refundBalanceListener.Run(ctx)
+	go transferListener.Run(ctx)
+
 	return nil
 }
 
@@ -131,6 +181,12 @@ func initRabbitInfrastructure(channel *amqp091.Channel) error {
 	if _, err := channel.QueueDeclare(constants.CreateAssetQueueName, true, false, false, false, nil); err != nil {
 		return err
 	}
+	if _, err := channel.QueueDeclare(constants.DeactivateAssetQueueName, true, false, false, false, nil); err != nil {
+		return err
+	}
+	if _, err := channel.QueueDeclare(constants.AddNewCurrencyQueueName, true, false, false, false, nil); err != nil {
+		return err
+	}
 	if _, err := channel.QueueDeclare(constants.EmmitAssetQueueName, true, false, false, false, nil); err != nil {
 		return err
 	}
@@ -144,6 +200,12 @@ func initRabbitInfrastructure(channel *amqp091.Channel) error {
 		return nil
 	}
 	if err := channel.QueueBind(constants.GetAssetsByIdQueueName, constants.RkGetAssetsRequest, constants.BpsExchange, false, nil); err != nil {
+		return nil
+	}
+	if err := channel.QueueBind(constants.AddNewCurrencyQueueName, constants.RkAddCurrencyRequest, constants.BpsExchange, false, nil); err != nil {
+		return nil
+	}
+	if err := channel.QueueBind(constants.DeactivateAssetQueueName, constants.RkDeactivateAssetRequest, constants.BpsExchange, false, nil); err != nil {
 		return nil
 	}
 	return nil

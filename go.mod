@@ -8,10 +8,7 @@ require (
 	google.golang.org/protobuf v1.32.0
 )
 
-require (
-	github.com/caarlos0/env v3.5.0+incompatible // indirect
-	golang.org/x/sys v0.16.0 // indirect
-)
+require golang.org/x/sys v0.16.0 // indirect
 
 require (
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect

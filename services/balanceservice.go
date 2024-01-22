@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"trade-balance-service/dto"
+	"trade-balance-service/external/bps"
 	"trade-balance-service/staticserr"
 
 	logger "github.com/sirupsen/logrus"
@@ -15,9 +16,9 @@ type IBalanceProvider interface {
 	InsertBalanceInfo(ctx context.Context, assetId string, currencyId string, amount float64) error
 	EmmitBalanceByCurrency(ctx context.Context, assetId string, currencyId string, amount float64) error
 	EmmitBalanceById(ctx context.Context, id string, amount float64) error
-	LockBalanceById(ctx context.Context, id string, amount float64) error
+	LockBalanceByCurrency(ctx context.Context, assetId, currencyId string, amount float64) (string, error)
 	RefundBalanceById(ctx context.Context, id string, amount float64) error
-	ChargeBalanceById(ctx context.Context, id string, amount float64) error
+	ChargeBalancesByIds(ctx context.Context, matchingInfos []*bps.BpsTransferData) error
 	DeleteBalanceById(ctx context.Context, id string) error
 }
 
@@ -66,6 +67,32 @@ func (b *BalanceService) EmmitBalance(ctx context.Context, assetId string, curre
 	return nil
 }
 
+func (b *BalanceService) LockBalance(ctx context.Context, currencyCode string, assetId string, amount float64) (string, error) {
+	currencyModel, err := b.currencyProvider.GetCurrencyInfoByCode(ctx, currencyCode)
+
+	if err != nil {
+		return "", err
+	}
+
+	id, err := b.balanceProvider.LockBalanceByCurrency(ctx, assetId, currencyModel.Id, amount)
+
+	if err != nil {
+		return "", err
+	}
+
+	return id, nil
+}
+
+func (b *BalanceService) RefundBalance(ctx context.Context, id string, amount float64) error {
+	err := b.balanceProvider.RefundBalanceById(ctx, id, amount)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (b *BalanceService) AddCurrency(ctx context.Context, currencyName string, currencyCode string) error {
 	_, err := b.currencyProvider.GetCurrencyInfoByCode(ctx, currencyCode)
 
@@ -93,6 +120,10 @@ func (b *BalanceService) GetInfoAboutAssets(ctx context.Context, assetId string)
 	}
 
 	return b.mapToPublicInfo(ctx, balancesDto), nil
+}
+
+func (b *BalanceService) CreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest) error {
+	return b.balanceProvider.ChargeBalancesByIds(ctx, request.TransferData)
 }
 
 func (b *BalanceService) mapToPublicInfo(ctx context.Context, privateInfos []dto.BalanceModel) []dto.PublicBalanceModel {
