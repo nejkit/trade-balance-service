@@ -18,7 +18,7 @@ type IBalanceProvider interface {
 	EmmitBalanceById(ctx context.Context, id string, amount float64) error
 	LockBalanceByCurrency(ctx context.Context, assetId, currencyId string, amount float64) (string, error)
 	RefundBalanceById(ctx context.Context, id string, amount float64) error
-	ChargeBalancesByIds(ctx context.Context, matchingInfos []*bps.BpsTransferData) error
+	ChargeBalancesByIds(ctx context.Context, matchingInfos []*bps.BpsTransferData, respChan chan dto.TransferState)
 	DeleteBalanceById(ctx context.Context, id string) error
 }
 
@@ -97,6 +97,7 @@ func (b *BalanceService) AddCurrency(ctx context.Context, currencyName string, c
 	_, err := b.currencyProvider.GetCurrencyInfoByCode(ctx, currencyCode)
 
 	if err != nil && err != staticserr.ErrorNotExistsCurrency {
+		logger.Errorln(err.Error())
 		return err
 	}
 
@@ -106,6 +107,7 @@ func (b *BalanceService) AddCurrency(ctx context.Context, currencyName string, c
 
 	err = b.currencyProvider.InsertCurrencyInfo(ctx, currencyCode, currencyName)
 	if err != nil {
+		logger.Errorln(err.Error())
 		return err
 	}
 
@@ -122,8 +124,10 @@ func (b *BalanceService) GetInfoAboutAssets(ctx context.Context, assetId string)
 	return b.mapToPublicInfo(ctx, balancesDto), nil
 }
 
-func (b *BalanceService) CreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest) error {
-	return b.balanceProvider.ChargeBalancesByIds(ctx, request.TransferData)
+func (b *BalanceService) CreateTransfer(ctx context.Context,
+	request *bps.BpsCreateTransferRequest,
+	respChan chan dto.TransferState) {
+	b.balanceProvider.ChargeBalancesByIds(ctx, request.TransferData, respChan)
 }
 
 func (b *BalanceService) mapToPublicInfo(ctx context.Context, privateInfos []dto.BalanceModel) []dto.PublicBalanceModel {

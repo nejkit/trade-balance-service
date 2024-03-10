@@ -14,8 +14,8 @@ func main() {
 	// 	return
 	// }
 
-	cfg.RabbitUser = "guest"
-	cfg.RabbitPassword = "guest"
+	cfg.RabbitUser = "admin"
+	cfg.RabbitPassword = "admin"
 	cfg.RabbitHost = "localhost"
 	cfg.RabbitPort = "5672"
 

@@ -17,7 +17,7 @@ type IFlow interface {
 	DeactivateAsset(ctx context.Context, request *bps.BpsDeactivateAssetRequest) *bps.BpsDeactivateAssetResponse
 	LockBalanceAsset(ctx context.Context, request *bps.BpsLockBalanceRequest) *bps.BpsLockBalanceResponse
 	RefundBalanceAsset(ctx context.Context, request *bps.BpsRefundBalanceRequest) *bps.BpsRefundBalanceResponse
-	CreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest) *bps.BpsTransfer
+	CreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest)
 }
 
 type ISender interface {
@@ -69,15 +69,5 @@ func (h *HandlerCollection) HandleRefundBalanceAsset(ctx context.Context, reques
 }
 
 func (h *HandlerCollection) HandleCreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest) {
-	resp := &bps.BpsTransfer{
-		Id:            request.Id,
-		TransferData:  request.TransferData,
-		TransferState: bps.BpsTransferState_BPS_TRANSFER_STATE_IN_PROCESS,
-	}
-
-	h.sender.SendMessage(ctx, resp, constants.BpsExchange, constants.RkTransferResponse)
-
-	resp = h.flow.CreateTransfer(ctx, request)
-
-	h.sender.SendMessage(ctx, resp, constants.BpsExchange, constants.RkTransferResponse)
+	go h.flow.CreateTransfer(ctx, request)
 }

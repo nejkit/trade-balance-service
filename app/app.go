@@ -193,6 +193,19 @@ func initRabbitInfrastructure(channel *amqp091.Channel) error {
 	if _, err := channel.QueueDeclare(constants.GetAssetsByIdQueueName, true, false, false, false, nil); err != nil {
 		return err
 	}
+
+	if _, err := channel.QueueDeclare(constants.LockBalanceAssetQueueName, true, false, false, false, nil); err != nil {
+		return err
+	}
+
+	if _, err := channel.QueueDeclare(constants.UnlockBalanceAssetQueueName, true, false, false, false, nil); err != nil {
+		return err
+	}
+
+	if _, err := channel.QueueDeclare(constants.CreateTransferQueueName, true, false, false, false, nil); err != nil {
+		return err
+	}
+
 	if err := channel.QueueBind(constants.CreateAssetQueueName, constants.RkCreateAssetRequest, constants.BpsExchange, false, nil); err != nil {
 		return nil
 	}
@@ -208,5 +221,18 @@ func initRabbitInfrastructure(channel *amqp091.Channel) error {
 	if err := channel.QueueBind(constants.DeactivateAssetQueueName, constants.RkDeactivateAssetRequest, constants.BpsExchange, false, nil); err != nil {
 		return nil
 	}
+
+	if err := channel.QueueBind(constants.CreateTransferQueueName, constants.RkCreateTransferRequest, constants.BpsExchange, false, nil); err != nil {
+		return err
+	}
+
+	if err := channel.QueueBind(constants.LockBalanceAssetQueueName, constants.RkLockBalanceAssetRequest, constants.BpsExchange, false, nil); err != nil {
+		return err
+	}
+
+	if err := channel.QueueBind(constants.UnlockBalanceAssetQueueName, constants.RkUnlockBalanceAssetRequest, constants.BpsExchange, false, nil); err != nil {
+		return err
+	}
+
 	return nil
 }

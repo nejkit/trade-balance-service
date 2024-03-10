@@ -9,4 +9,5 @@ var (
 	ErrorCurrencyAlreadyExists = errors.New("CurrencyAlreadyExists")
 	ErrorRabbitConnectionFail  = errors.New("ErrorRabbitConnectionFail")
 	ErrorNotRelatedAccount     = errors.New("NotRelatedAccount")
+	ErrorAssetIsLocked         = errors.New("AssetIsLocked")
 )

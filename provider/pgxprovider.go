@@ -66,7 +66,11 @@ func (p *PgxProvider) PerformTx(ctx context.Context) (*txContainer, error) {
 		return nil, err
 	}
 
-	tx, err := con.Begin(ctx)
+	tx, err := con.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:       pgx.Serializable,
+		AccessMode:     pgx.ReadWrite,
+		DeferrableMode: pgx.Deferrable,
+	})
 
 	if err != nil {
 		return nil, err

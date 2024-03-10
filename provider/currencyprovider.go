@@ -11,7 +11,7 @@ import (
 var (
 	getCurrencyInfoByShortName = "select id, currency_name, currency_code from currencies where currency_code = $1"
 	getCurrencyInfoById        = "select id, currency_name, currency_code from currencies where id = $1"
-	addNewCurrencyInfoQuery    = "insert into currencies ($1, $2, $3)"
+	addNewCurrencyInfoQuery    = "insert into currencies values ($1, $2, $3)"
 )
 
 type CurrencyProvider struct {
@@ -34,7 +34,13 @@ func (c *CurrencyProvider) GetCurrencyInfoByCode(ctx context.Context, code strin
 
 	data := dto.CurrencyModel{}
 
-	if err = row.Scan(&data.Id, &data.CurrencyName, &data.CurrencyCode); err != nil {
+	err = row.Scan(&data.Id, &data.CurrencyName, &data.CurrencyCode)
+
+	if err == pgx.ErrNoRows {
+		return nil, staticserr.ErrorNotExistsCurrency
+	}
+
+	if err != nil {
 		return nil, err
 	}
 

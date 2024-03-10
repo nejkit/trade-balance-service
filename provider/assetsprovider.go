@@ -50,7 +50,7 @@ func (a *AssetsProvider) InsertNewAssetInfo(ctx context.Context, accountId strin
 	id := uuid.NewString()
 	createdDate := time.Now().UTC().UnixMilli()
 
-	err := a.commonProvider.ExecuteQuery(ctx, insertAssetQuery, id, createdDate, dto.ACTIVE, accountId)
+	err := a.commonProvider.ExecuteQuery(ctx, insertAssetQuery, id, accountId, createdDate, dto.ACTIVE)
 
 	if err != nil {
 		return "", err

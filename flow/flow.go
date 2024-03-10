@@ -26,7 +26,7 @@ type IBalanceService interface {
 	GetInfoAboutAssets(ctx context.Context, assetId string) ([]dto.PublicBalanceModel, error)
 	LockBalance(ctx context.Context, currencyCode string, assetId string, amount float64) (string, error)
 	RefundBalance(ctx context.Context, id string, amount float64) error
-	CreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest) error
+	CreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest, respChan chan dto.TransferState)
 }
 
 type ISender interface {
@@ -207,30 +207,35 @@ func (f *Flow) RefundBalanceAsset(ctx context.Context, request *bps.BpsRefundBal
 	return response
 }
 
-func (f *Flow) CreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest) *bps.BpsTransfer {
+func (f *Flow) CreateTransfer(ctx context.Context, request *bps.BpsCreateTransferRequest) {
 
 	response := &bps.BpsTransfer{
 		Id:           request.Id,
 		TransferData: request.TransferData,
+		CreatedAt:    time.Now().UTC().UnixMilli(),
+		UpdatedAt:    time.Now().UTC().UnixMilli(),
 	}
 
-	err := f.balanceService.CreateTransfer(ctx, request)
+	respChan := make(chan dto.TransferState)
 
-	if err == staticserr.ErrorNotEnoughBalance {
-		response.TransferState = bps.BpsTransferState_BPS_TRANSFER_STATE_REJECTED
-		return response
+	go f.balanceService.CreateTransfer(ctx, request, respChan)
+
+	for {
+		select {
+		case state, ok := <-respChan:
+			if !ok {
+				return
+			}
+			if state.State == bps.BpsTransferState_BPS_TRANSFER_STATE_ERROR {
+				response.Error = &bps.BpsError{ErrorCode: utils.MapError(state.Err), Message: state.Err.Error()}
+			}
+			response.TransferState = state.State
+			response.UpdatedAt = time.Now().UTC().UnixMilli()
+			f.sender.SendMessage(ctx, response, constants.BpsExchange, constants.RkTransferResponse)
+		default:
+			time.Sleep(time.Microsecond)
+		}
 	}
-
-	if err != nil {
-		response.TransferState = bps.BpsTransferState_BPS_TRANSFER_STATE_ERROR
-		response.Error = &bps.BpsError{Message: err.Error(), ErrorCode: utils.MapError(err)}
-		return response
-	}
-
-	response.TransferState = bps.BpsTransferState_BPS_TRANSFER_STATE_DONE
-
-	return response
-
 }
 
 func mapAssetInfoToProto(asset dto.TradeAsset, balancesInfo []dto.PublicBalanceModel) *bps.BpsGetAssetInfoResponse {

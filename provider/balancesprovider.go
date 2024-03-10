@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"time"
 	"trade-balance-service/dto"
 	"trade-balance-service/external/bps"
 	"trade-balance-service/staticserr"
@@ -205,48 +206,101 @@ func (b *BalancesProvider) RefundBalanceById(ctx context.Context, id string, amo
 	return nil
 }
 
-func (b *BalancesProvider) ChargeBalancesByIds(ctx context.Context, matchingInfos []*bps.BpsTransferData) error {
+func chargeBalance(ctx context.Context, model dto.BalanceModel, amount float64, tx *txContainer) error {
 
-	tx, err := b.commonProvider.PerformTx(ctx)
+	return tx.ExecuteQuery(ctx, chargeBalanceByIdQuery, model.Id, amount)
+}
 
+func emmitBalance(ctx context.Context, model dto.BalanceModel, amount float64, tx *txContainer) error {
+
+	return tx.ExecuteQuery(ctx, emmitBalanceByIdQuery, model.Id, amount)
+}
+
+func (b *BalancesProvider) ChargeBalancesByIds(
+	ctx context.Context,
+	matchingInfos []*bps.BpsTransferData,
+	extRespChan chan dto.TransferState) {
+
+	childCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+
+	defer time.AfterFunc(time.Second, func() {
+		cancel()
+		close(extRespChan)
+	})
+
+	extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_NEW}
+	tx, err := b.commonProvider.PerformTx(childCtx)
 	if err != nil {
-		return err
+		extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_ERROR, Err: err}
+		return
 	}
+
+	balances := make([]dto.BalanceModel, 2)
+	responses := make([]chan pgx.Row, 2)
+	chargeData := make(map[string]float64)
+	transferData := make(map[string]float64)
+
+	extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_IN_PROCESS}
 
 	for _, tData := range matchingInfos {
+		respChan := make(chan pgx.Row)
+		tData := tData
+		go func() {
+			data := tx.ExecuteQueryWithRow(childCtx, getBalanceByIdQuery, tData.From)
+			respChan <- data
+		}()
+		chargeData[tData.From] = tData.Amount
+		transferData[tData.To] = tData.Amount
+		responses = append(responses, respChan)
+	}
 
-		balanceData := tx.ExecuteQueryWithRow(ctx, getBalanceByIdQuery, tData.BalanceId)
+	for _, resp := range responses {
 
-		var balanceModel dto.BalanceModel
+		var balInfo dto.BalanceModel
 
-		if err := balanceData.Scan(&balanceModel.Id, &balanceModel.AssetId, &balanceModel.CurrencyId, &balanceModel.Amount, &balanceModel.LockedAmount); err != nil {
-			tx.tx.Rollback(ctx)
-			return err
+		data := <-resp
+
+		if err = data.Scan(&balInfo.Id, &balInfo.AssetId, &balInfo.CurrencyId, &balInfo.Amount, &balInfo.LockedAmount); err != nil {
+			tx.tx.Rollback(childCtx)
+			extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_ERROR, Err: err}
+			return
 		}
 
-		if balanceModel.LockedAmount < tData.Amount {
-			tx.tx.Rollback(ctx)
-			return staticserr.ErrorNotEnoughBalance
+		balances = append(balances, balInfo)
+	}
+
+	for _, info := range balances {
+
+		if info.LockedAmount < chargeData[info.Id] {
+			tx.tx.Rollback(childCtx)
+			extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_REJECTED}
+			return
 		}
 
-		if err = tx.ExecuteQuery(ctx, chargeBalanceByIdQuery, balanceModel.Id, tData.Amount); err != nil {
-			tx.tx.Rollback(ctx)
-			return err
-		}
-
-		if err = tx.ExecuteQuery(ctx, emmitBalanceByIdQuery, balanceModel.Id, tData.Amount); err != nil {
-			tx.tx.Rollback(ctx)
-			return err
+		if err = chargeBalance(childCtx, info, chargeData[info.Id], tx); err != nil {
+			tx.tx.Rollback(childCtx)
+			extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_ERROR, Err: err}
+			return
 		}
 	}
 
-	if err = tx.CommitTx(ctx); err != nil {
-		tx.tx.Rollback(ctx)
-		return err
+	extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_CHARGED}
+
+	for _, info := range balances {
+		if err = emmitBalance(childCtx, info, transferData[info.Id], tx); err != nil {
+			tx.tx.Rollback(childCtx)
+			extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_ERROR, Err: err}
+			return
+		}
 	}
 
-	return nil
+	if err = tx.CommitTx(childCtx); err != nil {
+		tx.tx.Rollback(childCtx)
+		extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_ERROR, Err: err}
+		return
+	}
 
+	extRespChan <- dto.TransferState{State: bps.BpsTransferState_BPS_TRANSFER_STATE_DONE}
 }
 
 func (b *BalancesProvider) DeleteBalanceById(ctx context.Context, id string) error {
