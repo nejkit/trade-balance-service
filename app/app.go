@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	logger "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"syscall"
@@ -32,6 +33,8 @@ func getFlow(ctx context.Context, postgreeUrl string, sender *rabbit.Sender) (*f
 		return nil, err
 	}
 
+	logger.Infoln("Postgres connect on ", postgreeUrl)
+
 	pgxProvider := provider.NewPgxProvider(pgxPool)
 
 	assetsProvider := provider.NewAssetsProvider(&pgxProvider)
@@ -41,9 +44,9 @@ func getFlow(ctx context.Context, postgreeUrl string, sender *rabbit.Sender) (*f
 	assetService := services.NewAssetService(&assetsProvider)
 	balancesService := services.NewBalanceService(&balancesProvider, &currenciesProvider)
 
-	flow := flow.NewFlow(&assetService, &balancesService, sender)
+	flowApi := flow.NewFlow(&assetService, &balancesService, sender)
 
-	return flow, nil
+	return flowApi, nil
 }
 
 func initHandler(ctx context.Context, rabbitUrl string, postgreeUrl string) error {
@@ -117,9 +120,9 @@ func initHandler(ctx context.Context, rabbitUrl string, postgreeUrl string) erro
 
 	sender := rabbit.NewSender(ctx, senderChannel)
 
-	flow, err := getFlow(ctx, postgreeUrl, &sender)
+	flowApi, err := getFlow(ctx, postgreeUrl, &sender)
 
-	handlerCollection := handler.NewHandlerCollection(flow, &sender)
+	handlerCollection := handler.NewHandlerCollection(flowApi, &sender)
 
 	creationAssetProcessor := rabbit.NewProcessor[bps.BpsCreateAssetRequest](rabbit.GetParserForCreationAssetRequest(), handlerCollection.HandleCreateAsset)
 	emmitAssetProcessor := rabbit.NewProcessor[bps.BpsEmmitAssetRequest](rabbit.GetParserForEmmitAssetRequest(), handlerCollection.HandleEmmitAsset)
@@ -152,6 +155,7 @@ func initHandler(ctx context.Context, rabbitUrl string, postgreeUrl string) erro
 	go refundBalanceListener.Run(ctx)
 	go transferListener.Run(ctx)
 
+	logger.Infoln("Application was started!")
 	return nil
 }
 

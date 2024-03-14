@@ -3,35 +3,32 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"trade-balance-service/app"
 	"trade-balance-service/config"
 	// "github.com/caarlos0/env"
 )
 
 func main() {
-	var cfg config.Config
-	// if err := env.Parse(&cfg); err != nil {
-	// 	return
-	// }
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02 15:04:05.000",
+	})
 
-	cfg.RabbitUser = "admin"
-	cfg.RabbitPassword = "admin"
-	cfg.RabbitHost = "localhost"
-	cfg.RabbitPort = "5672"
+	cfg, err := config.GetConfig()
 
-	cfg.PostgreeUser = "admin"
-	cfg.PostgreePassword = "admin"
-	cfg.PostgreeHost = "localhost"
-	cfg.PostgreePort = "5432"
-	cfg.PostgreeDB = "bps"
+	if err != nil {
+		logrus.Error(err.Error())
+		return
+	}
 
-	app.StartProgram(context.Background(), buildPostgreeUrl(cfg), buildRabbitUrl(cfg))
+	app.StartProgram(context.Background(), buildPostgresUrl(cfg), buildRabbitUrl(cfg))
 }
 
-func buildRabbitUrl(cfg config.Config) string {
-	return fmt.Sprintf("amqp://%s:%s@%s:%s", cfg.RabbitUser, cfg.RabbitPassword, cfg.RabbitHost, cfg.RabbitPort)
+func buildRabbitUrl(cfg *config.Config) string {
+	return fmt.Sprintf("amqp://%s:%s@%s:%s", cfg.Rabbit.User, cfg.Rabbit.Password, cfg.Rabbit.Host, cfg.Rabbit.Port)
 }
 
-func buildPostgreeUrl(cfg config.Config) string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", cfg.PostgreeUser, cfg.PostgreePassword, cfg.PostgreeHost, cfg.PostgreePort, cfg.PostgreeDB)
+func buildPostgresUrl(cfg *config.Config) string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", cfg.Postgres.User, cfg.Postgres.Password, cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.Db)
 }

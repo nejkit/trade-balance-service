@@ -15,6 +15,8 @@ func MapError(err error) bps.BpsErrorCode {
 		return bps.BpsErrorCode_BPS_ERROR_CODE_NOT_EXISTS_CURRENCY
 	case staticserr.ErrorNotRelatedAccount:
 		return bps.BpsErrorCode_BPS_ERROR_CODE_ASSET_NOT_RELATED_TO_ACCOUNT
+	case staticserr.ErrorCurrencyAlreadyExists:
+		return bps.BpsErrorCode_BPS_ERROR_CODE_NOT_EXISTS_CURRENCY
 	default:
 		return bps.BpsErrorCode_BPS_ERROR_CODE_INTERNAL
 	}

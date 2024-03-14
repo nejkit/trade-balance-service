@@ -1,13 +1,17 @@
 package config
 
 type Config struct {
-	RabbitUser       string
-	RabbitPassword   string
-	RabbitHost       string
-	RabbitPort       string
-	PostgreeUser     string
-	PostgreePassword string
-	PostgreeHost     string
-	PostgreePort     string
-	PostgreeDB       string
+	Rabbit struct {
+		User     string
+		Password string
+		Host     string
+		Port     string
+	}
+	Postgres struct {
+		User     string
+		Password string
+		Host     string
+		Port     string
+		Db       string
+	}
 }

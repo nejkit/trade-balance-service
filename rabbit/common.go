@@ -1,6 +1,7 @@
 package rabbit
 
 import (
+	"github.com/sirupsen/logrus"
 	"time"
 	"trade-balance-service/external/bps"
 	"trade-balance-service/staticserr"
@@ -19,9 +20,12 @@ func GetRabbitConnection(connectionString string) (*amqp091.Connection, error) {
 			connect, err := amqp091.Dial(connectionString)
 
 			if err != nil {
+				logrus.Error(err.Error(), " Url: ", connectionString)
 				time.Sleep(time.Millisecond * 100)
 				continue
 			}
+
+			logrus.Infoln("Rabbit connect on ", connectionString)
 
 			return connect, nil
 		}

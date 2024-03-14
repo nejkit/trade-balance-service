@@ -42,5 +42,9 @@ services:
       - postgres:/var/lib/postgresql/data
     networks:
       - trade-network
-    
-    
+  bps:
+    image: tradebalanceservice:latest
+    container_name: bps
+
+    networks:
+      - trade-network

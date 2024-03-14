@@ -1,0 +1,11 @@
+rabbit:
+  user: admin
+  password: admin
+  host: localhost
+  port: 5672
+postgres:
+  user: admin
+  password: admin
+  host: localhost
+  port: 5432
+  db: bps
